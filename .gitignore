@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.log
+
+# 构建产物
+.build/
+build/
+dist/
+dist_onedir/
+*.spec
+
+# 开发临时
+scripts/_demo_appdata/
+scripts/_smoke_data/
+scripts/_capture_out/
+scripts/_screenshot*.png
+data/
+
+# 编辑器
+.vscode/
+.idea/

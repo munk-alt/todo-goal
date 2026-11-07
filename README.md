@@ -25,8 +25,10 @@
 
 ### 方式一：直接运行 exe（推荐，无需 Python）
 
-- 单文件版：双击 `dist\TodoApp.exe`
-- 若单文件版在个别加固环境报 `VCRUNTIME140.dll ... Permission denied`，改用**文件夹版** `dist_onedir\TodoApp\TodoApp.exe`（需保留同目录 `_internal`）。
+- **文件夹版（推荐）**：双击 `dist\TodoApp\TodoApp.exe`（需保留同目录的 `_internal` 文件夹，不要只单独拷走 exe）。
+- 也可双击项目根目录的 **`启动Todo.lnk`** 快捷方式。
+- 便携分发：`dist\TodoApp-portable.zip`（解压后运行里面的 `TodoApp\TodoApp.exe`）。
+- 不提供单文件版：单文件版启动时会把自身解压到系统临时目录，在受限/沙箱环境会报 `Could not create temporary directory!`。如确有需要，可自行执行 `.\build.ps1 -OneFile` 生成（能否运行取决于目标机器临时目录是否可写）。
 
 ### 方式二：用 Python 运行
 
@@ -80,8 +82,10 @@ TODO/
 ├─ build.ps1                 # 打包脚本
 ├─ requirements-build.txt    # 仅打包依赖（PyInstaller）
 ├─ docs/                     # 截图
-├─ dist/                     # 单文件 exe
-└─ dist_onedir/              # 文件夹版 exe
+├─ 启动Todo.lnk              # 指向 dist\TodoApp\TodoApp.exe 的快捷方式
+└─ dist/                     # 文件夹版产物
+   ├─ TodoApp/TodoApp.exe    # 主程序（需与 _internal 同目录）
+   └─ TodoApp-portable.zip   # 便携压缩包
 ```
 
 ## 开发与测试
@@ -98,19 +102,15 @@ python scripts\smoke_ui.py                # 无值守 UI 冒烟测试
 
 ```powershell
 cd "D:\Agent Project\TODO"
-.\build.ps1                       # 单文件版 -> dist\TodoApp.exe
-```
-
-文件夹版：
-
-```powershell
-python -m PyInstaller --noconfirm --clean --onedir --windowed --name TodoApp --distpath dist_onedir app.py
+.\build.ps1             # 默认文件夹版 -> dist\TodoApp\TodoApp.exe（推荐）
+.\build.ps1 -OneFile    # 可选单文件版 -> dist\TodoApp.exe（受限环境可能无法启动）
 ```
 
 ## 常见问题
 
-- **单文件 exe 首次启动慢 / 被杀软误报**：单文件版启动时会先解压到临时目录；加入杀软白名单，或改用文件夹版。
-- **`VCRUNTIME140.dll ... Permission denied`**：说明系统临时目录不可写（多见于受限/加固环境），改用文件夹版，或把 `TEMP` 指向可写目录。
+- **报 `Could not create temporary directory!` 或 `VCRUNTIME140.dll ... Permission denied`**：这是**单文件版**解压到系统临时目录失败，请改用文件夹版 `dist\TodoApp\TodoApp.exe`（不要使用已废弃的单文件 exe）。
+- **SmartScreen 提示「发布者未知 / 无法访问 SmartScreen」**：exe 未做代码签名，属正常现象。请**直接从文件夹双击** `dist\TodoApp\TodoApp.exe`（不要从未知来源的下载副本运行）；若仍提示，点「更多信息 → 仍要运行」。
+- **提示缺少文件**：文件夹版必须连同同目录的 `_internal` 文件夹一起复制或压缩。
 - **窗口跑到屏幕外**：删除 `%APPDATA%\TodoApp\settings.json` 后重启即可恢复默认位置。
 - **高分屏模糊**：程序启动时已开启 DPI 感知；若仍异常，可在系统兼容性里调整缩放。
 
@@ -120,5 +120,6 @@ python -m PyInstaller --noconfirm --clean --onedir --windowed --name TodoApp --d
 
 ## 版本
 
+- v2.0.1 —— 修复打包：改用文件夹版（避免单文件版在受限环境无法创建临时目录而打不开）。
 - v2.0.0 —— 改为便笺风：无边框半透明窗口、浅黑/浅白主题、待办（时间/地点/内容）与便签分栏、拖拽排序、自动保存。
 - v1.0.0 —— 初版窗口化表格应用。

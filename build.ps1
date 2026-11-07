@@ -1,5 +1,10 @@
 # 在 Windows PowerShell 中运行：  .\build.ps1
-# 产物： dist\TodoApp.exe （单文件、无控制台窗口）
+# 默认产物： dist\TodoApp\TodoApp.exe （文件夹版，推荐，启动不依赖临时目录）
+# 可选单文件：.\build.ps1 -OneFile  ->  dist\TodoApp.exe （注意：受限环境可能因临时目录不可写而报错）
+
+param(
+    [switch]$OneFile
+)
 
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
@@ -8,7 +13,7 @@ $pyLibs = Join-Path $PSScriptRoot ".build\pylibs"
 $hasPyInstaller = Test-Path (Join-Path $pyLibs "PyInstaller")
 
 if (-not $hasPyInstaller) {
-    Write-Host "正在安装 PyInstaller 到 .build\pylibs ..."
+    Write-Host "正在获取 PyInstaller 到 .build\pylibs ..."
     python -m pip install --no-warn-script-location --no-cache-dir --target $pyLibs "pyinstaller==6.22.3" 2>&1 | Out-Host
     if ($LASTEXITCODE -ne 0) {
         Write-Warning "pip 安装失败，改用直接下载 wheel 的方式（scripts\_fetch_wheels.py）。"
@@ -22,10 +27,17 @@ $env:TMP = Join-Path $PSScriptRoot ".build\tmp"
 $env:TEMP = $env:TMP
 New-Item -ItemType Directory -Force $env:TMP, ".build\work", "dist" | Out-Null
 
-Write-Host "开始打包 ..."
-python -m PyInstaller --noconfirm --clean --onefile --windowed --name TodoApp `
-    --distpath dist --workpath ".build\work" --specpath ".build" app.py
-if ($LASTEXITCODE -ne 0) { throw "PyInstaller 打包失败。" }
-
-Write-Host ""
-Write-Host "构建完成： $PSScriptRoot\dist\TodoApp.exe" -ForegroundColor Green
+if ($OneFile) {
+    Write-Host "开始打包（单文件）..."
+    python -m PyInstaller --noconfirm --clean --onefile --windowed --name TodoApp `
+        --distpath dist --workpath ".build\work" --specpath ".build" app.py
+    if ($LASTEXITCODE -ne 0) { throw "PyInstaller 打包失败。" }
+    Write-Host "`n构建完成： $PSScriptRoot\dist\TodoApp.exe" -ForegroundColor Green
+} else {
+    Write-Host "开始打包（文件夹版）..."
+    python -m PyInstaller --noconfirm --clean --onedir --windowed --name TodoApp `
+        --distpath dist --workpath ".build\work" --specpath ".build" app.py
+    if ($LASTEXITCODE -ne 0) { throw "PyInstaller 打包失败。" }
+    Write-Host "`n构建完成： $PSScriptRoot\dist\TodoApp\TodoApp.exe" -ForegroundColor Green
+    Write-Host "提示：分发时请连同同目录的 _internal 文件夹一起复制/压缩。" -ForegroundColor Yellow
+}

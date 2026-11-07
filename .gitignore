@@ -10,6 +10,7 @@ build/
 dist/
 dist_onedir/
 *.spec
+*.lnk
 
 # 开发临时
 scripts/_demo_appdata/

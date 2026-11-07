@@ -11,12 +11,16 @@
 
 from __future__ import annotations
 
+import ctypes
 import json
+import queue
+import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 from typing import List, Optional
 
+from ..hotkey import SHOW_EVENT_NAME, GlobalHotkey
 from ..models import Todo
 from ..service import TodoService
 from . import theme
@@ -62,6 +66,39 @@ class MainWindow:
         self._load_note()
 
         root.bind("<Control-n>", lambda e: self._add_todo())
+
+        # 全局快捷键（Ctrl+Shift+空格）：随时把窗口调出并置顶
+        self._hotkey_queue: "queue.Queue[bool]" = queue.Queue()
+        self._hotkey = GlobalHotkey(lambda: self._hotkey_queue.put(True))
+        self.hotkey_ok = self._hotkey.start_and_wait(1.5)
+        self.root.after(150, self._poll_hotkey)
+        self._setup_show_event()
+
+    def _setup_show_event(self) -> None:
+        """命名事件：其它实例（再次双击）可借此把本窗口唤起。"""
+        self._show_event = None
+        try:
+            kernel32 = ctypes.windll.kernel32
+            kernel32.CreateEventW.restype = ctypes.c_void_p
+            kernel32.CreateEventW.argtypes = [ctypes.c_void_p, ctypes.c_bool,
+                                              ctypes.c_bool, ctypes.c_wchar_p]
+            self._show_event = kernel32.CreateEventW(None, False, False, SHOW_EVENT_NAME)
+            if self._show_event:
+                threading.Thread(target=self._watch_show_event, daemon=True).start()
+        except Exception:  # noqa: BLE001
+            self._show_event = None
+
+    def _watch_show_event(self) -> None:
+        kernel32 = ctypes.windll.kernel32
+        kernel32.WaitForSingleObject.restype = ctypes.c_uint
+        kernel32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+        while True:
+            try:
+                result = kernel32.WaitForSingleObject(self._show_event, 1000)
+            except Exception:  # noqa: BLE001
+                return
+            if result == 0:
+                self._hotkey_queue.put(True)
 
     # ------------------------------------------------------------------
     # 窗口属性 / 几何
@@ -139,11 +176,13 @@ class MainWindow:
 
         controls = tk.Frame(bar, bg=colors["window_bg"])
         controls.pack(side="right", padx=(0, 8))
-        self._icon_button(controls, "✕", self._on_close)
+        self._icon_button(controls, "✕", self._on_hide)
         self._pin_btn = self._icon_button(controls, "顶", self._toggle_pin,
                                           active=self._topmost)
         self._theme_btn = self._icon_button(controls, "亮" if self.theme_name == "dark" else "暗",
                                             self._toggle_theme)
+        bar.bind("<Button-3>", self._show_title_menu)
+        title.bind("<Button-3>", self._show_title_menu)
 
     def _icon_button(self, parent, text: str, command, active: bool = False) -> tk.Label:
         colors = self.colors
@@ -427,7 +466,75 @@ class MainWindow:
         height = max(360, h0 + (event.y_root - y0))
         self.root.geometry(f"{width}x{height}")
 
-    def _on_close(self) -> None:
+    # ------------------------------------------------------------------
+    # 显示 / 隐藏 / 退出
+    # ------------------------------------------------------------------
+    def show_window(self) -> None:
+        try:
+            self.root.deiconify()
+        except tk.TclError:
+            return
+        try:
+            self.root.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        self.root.lift()
+        try:
+            self.root.focus_force()
+        except tk.TclError:
+            pass
+        if not self._topmost:
+            self.root.after(500, self._restore_topmost)
+
+    def _restore_topmost(self) -> None:
+        try:
+            self.root.attributes("-topmost", self._topmost)
+        except tk.TclError:
+            pass
+
+    def _poll_hotkey(self) -> None:
+        fired = False
+        try:
+            while True:
+                self._hotkey_queue.get_nowait()
+                fired = True
+        except queue.Empty:
+            pass
+        if fired:
+            self.show_window()
+        self.root.after(150, self._poll_hotkey)
+
+    def _on_hide(self) -> None:
+        if not getattr(self, "hotkey_ok", False):
+            messagebox.showinfo(
+                "提示", "全局快捷键注册失败，已取消隐藏（以免隐藏后无法唤出）。\n"
+                        "可使用右键菜单「退出程序」。", parent=self.root)
+            return
         self._save_note_now()
         self._save_settings()
+        try:
+            self.root.withdraw()
+        except tk.TclError:
+            pass
+
+    def _on_quit(self) -> None:
+        self._save_note_now()
+        self._save_settings()
+        try:
+            self._hotkey.stop()
+        except Exception:  # noqa: BLE001
+            pass
         self.root.destroy()
+
+    def _show_title_menu(self, event) -> None:
+        colors = self.colors
+        menu = tk.Menu(self.root, tearoff=0, bg=colors["panel"], fg=colors["text"],
+                       activebackground=colors["accent"], activeforeground=colors["window_bg"],
+                       bd=0, activeborderwidth=0)
+        menu.add_command(label="隐藏到后台（Ctrl+Shift+空格 唤出）", command=self._on_hide)
+        menu.add_separator()
+        menu.add_command(label="退出程序", command=self._on_quit)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()

@@ -30,6 +30,7 @@ from .widgets import ScrollableFrame, enable_window_drag
 DEFAULT_WIDTH = 362
 DEFAULT_HEIGHT = 560
 SCREEN_MARGIN = 36
+NOTE_BULLET = "• "
 
 
 class MainWindow:
@@ -238,7 +239,10 @@ class MainWindow:
             padx=10, pady=8, undo=True,
         )
         self.note_text.grid(row=5, column=0, sticky="nsew", padx=14, pady=(0, 12))
+        self.note_text.tag_configure("bullet", foreground=colors["accent"])
         self.note_text.bind("<KeyRelease>", self._on_note_edit)
+        self.note_text.bind("<Return>", self._on_note_return)
+        self.note_text.bind("<BackSpace>", self._on_note_backspace)
         self.note_text.bind("<FocusOut>", lambda e: self._save_note_now())
 
     def _build_resize_grip(self) -> None:
@@ -397,11 +401,73 @@ class MainWindow:
     # ------------------------------------------------------------------
     def _load_note(self) -> None:
         note = self.service.get_note()
-        self._note_cache = note.content
-        self.note_text.delete("1.0", "end")
-        if note.content:
-            self.note_text.insert("1.0", note.content)
+        stored = note.content or ""
         self.saved_label.config(text="")
+        if stored.strip() == "":
+            self._note_cache = ""
+            self._render_note(NOTE_BULLET)
+            return
+
+        normalized = self._normalize_note(stored)
+        self._render_note(normalized)
+        self._note_cache = stored
+        if normalized != stored:
+            # 旧便签没有圆点：迁移为带圆点的形式
+            self.service.save_note(normalized)
+            self._note_cache = normalized
+
+    @staticmethod
+    def _normalize_note(text: str) -> str:
+        """确保每个非空段落都以「• 」开头；空行保持为空。"""
+        lines = []
+        for line in (text or "").split("\n"):
+            stripped = line.strip()
+            if not stripped:
+                lines.append("")
+            elif stripped.startswith("• "):
+                lines.append(stripped)
+            elif stripped.startswith("•"):
+                lines.append("• " + stripped[1:].lstrip())
+            else:
+                lines.append("• " + stripped)
+        return "\n".join(lines)
+
+    def _render_note(self, text: str) -> None:
+        """把文本写入便签框，圆点用强调色标签渲染。"""
+        self.note_text.delete("1.0", "end")
+        lines = text.split("\n")
+        for index, line in enumerate(lines):
+            if line.startswith("• "):
+                self.note_text.insert("end-1c", "•", ("bullet",))
+                self.note_text.insert("end-1c", " " + line[2:])
+            else:
+                self.note_text.insert("end-1c", line)
+            if index < len(lines) - 1:
+                self.note_text.insert("end-1c", "\n")
+        self.note_text.mark_set("insert", "end-1c")
+
+    def _on_note_return(self, _event=None):
+        """回车：换行并自动生成下一个圆点。"""
+        self.note_text.insert("insert", "\n")
+        self.note_text.insert("insert", "•", ("bullet",))
+        self.note_text.insert("insert", " ")
+        self._on_note_edit()
+        return "break"
+
+    def _on_note_backspace(self, _event=None):
+        """段首退格：删除圆点并与上一段合并（与 Windows 便签一致）。"""
+        try:
+            index = self.note_text.index("insert")
+            line = int(index.split(".")[0])
+        except (tk.TclError, ValueError):
+            return None
+        if index == f"{line}.3" and self.note_text.get(f"{line}.1", f"{line}.3") == "• ":
+            self.note_text.delete(f"{line}.1", f"{line}.3")
+            if line > 1:
+                self.note_text.delete(f"{line - 1}.end", f"{line}.1")
+            self._on_note_edit()
+            return "break"
+        return None
 
     def _on_note_edit(self, _event=None) -> None:
         if self._note_job is not None:
@@ -417,6 +483,8 @@ class MainWindow:
             content = self.note_text.get("1.0", "end-1c")
         except tk.TclError:
             return
+        if content.strip() in ("", "•"):
+            content = ""
         if content != self._note_cache:
             self.service.save_note(content)
             self._note_cache = content

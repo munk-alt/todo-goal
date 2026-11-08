@@ -10,6 +10,7 @@ build/
 dist/
 dist_onedir/
 release/
+release2/
 *.spec
 *.lnk
 

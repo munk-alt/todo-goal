@@ -35,7 +35,10 @@ def main() -> int:
 
     print("todos rendered:", len(app._todos))
     assert len(app._todos) == 3
-    assert app.note_text.get("1.0", "end-1c").startswith("备忘")
+    note_display = app.note_text.get("1.0", "end-1c")
+    assert "备忘" in note_display
+    assert note_display.startswith("• "), note_display[:10]
+    print("note bullets ok")
 
     # 完成切换
     app._toggle(app._todos[0].id)
@@ -53,8 +56,15 @@ def main() -> int:
 
     # 便签保存
     app._save_note_now()
-    assert app.service.get_note().content.startswith("备忘")
+    assert "备忘" in app.service.get_note().content
     print("note ok")
+
+    # 回车自动生成圆点
+    app.note_text.mark_set("insert", "end-1c")
+    app._on_note_return()
+    root.update()
+    assert "\n• " in app.note_text.get("1.0", "end-1c")
+    print("enter bullet ok")
 
     # 对话框新增
     from todo.ui.todo_dialog import TodoDialog

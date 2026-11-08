@@ -412,9 +412,12 @@ class MainWindow:
         self._render_note(normalized)
         self._note_cache = stored
         if normalized != stored:
-            # 旧便签没有圆点：迁移为带圆点的形式
-            self.service.save_note(normalized)
-            self._note_cache = normalized
+            # 旧便签没有圆点：迁移为带圆点的形式（写库失败也不影响启动）
+            try:
+                self.service.save_note(normalized)
+                self._note_cache = normalized
+            except Exception:  # noqa: BLE001
+                self._note_cache = stored
 
     @staticmethod
     def _normalize_note(text: str) -> str:
@@ -486,7 +489,10 @@ class MainWindow:
         if content.strip() in ("", "•"):
             content = ""
         if content != self._note_cache:
-            self.service.save_note(content)
+            try:
+                self.service.save_note(content)
+            except Exception:  # noqa: BLE001
+                return
             self._note_cache = content
             self.saved_label.config(text="已保存", fg=self.colors["accent"])
             self.root.after(1500, lambda: self._reset_saved_label())

@@ -5,7 +5,7 @@
 
 param(
     [switch]$OneFile,
-    [string]$Out = "release2"
+    [string]$Out = "release"
 )
 
 $ErrorActionPreference = "Stop"

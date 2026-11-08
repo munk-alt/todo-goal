@@ -28,9 +28,9 @@
 
 ### 方式一：直接运行 exe（推荐，无需 Python）
 
-- **文件夹版（推荐）**：双击 `release2\TodoApp\TodoApp.exe`（需保留同目录的 `_internal` 文件夹，不要只单独拷走 exe）。
+- **文件夹版（推荐）**：双击 `release\TodoApp\TodoApp.exe`（需保留同目录的 `_internal` 文件夹，不要只单独拷走 exe）。
 - 也可双击项目根目录的 **`启动Todo.lnk`**，或在开始菜单搜索「Todo 便签」打开。
-- 便携分发：`release2\TodoApp-portable.zip`（解压后运行里面的 `TodoApp\TodoApp.exe`）。
+- 便携分发：`release\TodoApp-portable.zip`（解压后运行里面的 `TodoApp\TodoApp.exe`）。
 - 不提供单文件版：单文件版启动时会把自身解压到系统临时目录，在受限/沙箱环境会报 `Could not create temporary directory!`。如确有需要，可自行执行 `.\build.ps1 -OneFile` 生成（能否运行取决于目标机器临时目录是否可写）。
 
 ### 方式二：用 Python 运行
@@ -97,13 +97,11 @@ TODO/
 ├─ requirements-build.txt    # 仅打包依赖（PyInstaller）
 ├─ assets/                   # 应用图标（app.ico / app.png）
 ├─ docs/                     # 截图
-├─ 启动Todo.lnk              # 指向 release2\TodoApp\TodoApp.exe 的快捷方式
-└─ release2/                 # 当前使用的文件夹版产物
+├─ 启动Todo.lnk              # 指向 release\TodoApp\TodoApp.exe 的快捷方式
+└─ release/                  # 当前使用的文件夹版产物
    ├─ TodoApp/TodoApp.exe    # 主程序（需与 _internal 同目录）
    └─ TodoApp-portable.zip   # 便携压缩包
 ```
-
-> 旧的 `release/` 目录是历史构建，可能被系统占用，可忽略；重启电脑后可删除。
 
 ## 开发与测试
 
@@ -119,14 +117,14 @@ python scripts\smoke_ui.py                # 无值守 UI 冒烟测试
 
 ```powershell
 cd "D:\Agent Project\TODO"
-.\build.ps1             # 默认文件夹版 -> release2\TodoApp\TodoApp.exe（推荐）
-.\build.ps1 -OneFile    # 可选单文件版 -> release2\TodoApp.exe（受限环境可能无法启动）
+.\build.ps1             # 默认文件夹版 -> release\TodoApp\TodoApp.exe（推荐）
+.\build.ps1 -OneFile    # 可选单文件版 -> release\TodoApp.exe（受限环境可能无法启动）
 ```
 
 ## 常见问题
 
-- **报 `Could not create temporary directory!` 或 `VCRUNTIME140.dll ... Permission denied`**：这是**单文件版**解压到系统临时目录失败，请改用文件夹版 `release2\TodoApp\TodoApp.exe`（不要使用已废弃的单文件 exe）。
-- **SmartScreen 提示「发布者未知 / 无法访问 SmartScreen」**：exe 未做代码签名，属正常现象。请**直接从文件夹双击** `release2\TodoApp\TodoApp.exe`（不要从未知来源的下载副本运行）；若仍提示，点「更多信息 → 仍要运行」。
+- **报 `Could not create temporary directory!` 或 `VCRUNTIME140.dll ... Permission denied`**：这是**单文件版**解压到系统临时目录失败，请改用文件夹版 `release\TodoApp\TodoApp.exe`（不要使用已废弃的单文件 exe）。
+- **SmartScreen 提示「发布者未知 / 无法访问 SmartScreen」**：exe 未做代码签名，属正常现象。请**直接从文件夹双击** `release\TodoApp\TodoApp.exe`（不要从未知来源的下载副本运行）；若仍提示，点「更多信息 → 仍要运行」。
 - **提示缺少文件**：文件夹版必须连同同目录的 `_internal` 文件夹一起复制或压缩。
 - **窗口跑到屏幕外**：删除 `%APPDATA%\TodoApp\settings.json` 后重启即可恢复默认位置。
 - **高分屏模糊**：程序启动时已开启 DPI 感知；若仍异常，可在系统兼容性里调整缩放。

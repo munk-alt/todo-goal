@@ -9,12 +9,12 @@ __pycache__/
 build/
 dist/
 dist_onedir/
-release/
-release2/
+release*/
 *.spec
 *.lnk
 
 # 开发临时
+.tmpappdata*/
 scripts/_demo_appdata/
 scripts/_smoke_data/
 scripts/_capture_out/

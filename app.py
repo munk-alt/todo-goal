@@ -12,6 +12,7 @@ import os
 import sys
 import traceback
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from tkinter import messagebox
 
@@ -29,6 +30,16 @@ WINDOW_TITLE = "Todo · 便签"
 def app_data_dir() -> Path:
     base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or str(Path.home())
     return Path(base) / "TodoApp"
+
+
+def write_error_log(data_dir, text: str) -> None:
+    """把启动/运行期错误写入 %APPDATA%\\TodoApp\\error.log，便于窗口模式排查。"""
+    try:
+        path = Path(data_dir) / "error.log"
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(f"\n[{datetime.now():%Y-%m-%d %H:%M:%S}]\n{text}\n")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def enable_dpi_awareness() -> None:
@@ -83,11 +94,8 @@ def single_instance_guard():
 
 def main() -> int:
     hidden = "--hidden" in sys.argv[1:]
-    first, mutex = single_instance_guard()
-    if not first:
-        return 0
-
     enable_dpi_awareness()
+
     data_dir = app_data_dir()
     try:
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -95,10 +103,16 @@ def main() -> int:
         data_dir = Path(__file__).resolve().parent / "data"
         data_dir.mkdir(parents=True, exist_ok=True)
 
+    first, mutex = single_instance_guard()
+    if not first:
+        write_error_log(data_dir, "duplicate instance detected; this process exits after waking the existing window.")
+        return 0
+
     db_path = data_dir / "todo.db"
     try:
         repo = TaskRepository(str(db_path))
     except Exception as exc:  # noqa: BLE001
+        write_error_log(data_dir, f"database open failed: {db_path}\n{traceback.format_exc()}")
         root = tk.Tk()
         root.withdraw()
         messagebox.showerror(
@@ -113,11 +127,24 @@ def main() -> int:
     root = tk.Tk()
     root.title(WINDOW_TITLE)
     root._mutex = mutex  # 保持互斥量句柄存活
+
+    def report_callback_exception(exc, val, tb):
+        text = "".join(traceback.format_exception(exc, val, tb))
+        print(text)
+        write_error_log(data_dir, text)
+
+    root.report_callback_exception = report_callback_exception
+
     try:
         app = MainWindow(root, service, data_dir)
     except Exception:  # noqa: BLE001
-        traceback.print_exc()
-        messagebox.showerror("启动失败", "界面初始化失败，详情见控制台输出。")
+        text = traceback.format_exc()
+        print(text)
+        write_error_log(data_dir, "MainWindow init failed:\n" + text)
+        messagebox.showerror(
+            "启动失败",
+            "界面初始化失败。\n\n错误日志：" + str(data_dir / "error.log"),
+        )
         root.destroy()
         repo.close()
         return 1

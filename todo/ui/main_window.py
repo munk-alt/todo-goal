@@ -17,6 +17,7 @@ import queue
 import threading
 import tkinter as tk
 from pathlib import Path
+from tkinter import font as tkfont
 from tkinter import messagebox
 from typing import List, Optional
 
@@ -232,7 +233,7 @@ class MainWindow:
         self.saved_label.pack(side="right")
 
         self.note_text = tk.Text(
-            self.outer, wrap="word", bg=colors["input_bg"], fg=colors["text"],
+            self.outer, wrap="char", bg=colors["input_bg"], fg=colors["text"],
             insertbackground=colors["accent"], relief="flat", bd=0, height=6,
             highlightthickness=1, highlightbackground=colors["divider"],
             highlightcolor=colors["accent"], font=(self.family, 10),
@@ -240,6 +241,10 @@ class MainWindow:
         )
         self.note_text.grid(row=5, column=0, sticky="nsew", padx=14, pady=(0, 12))
         self.note_text.tag_configure("bullet", foreground=colors["accent"])
+        bullet_font = tkfont.Font(family=self.family, size=10)
+        self._bullet_indent = bullet_font.measure("• ") + 1
+        # lmargin2 让长段落换行后对齐到圆点后面的文字（悬挂缩进）
+        self.note_text.tag_configure("body", lmargin1=0, lmargin2=self._bullet_indent)
         self.note_text.bind("<KeyRelease>", self._on_note_edit)
         self.note_text.bind("<Return>", self._on_note_return)
         self.note_text.bind("<BackSpace>", self._on_note_backspace)
@@ -448,12 +453,20 @@ class MainWindow:
             if index < len(lines) - 1:
                 self.note_text.insert("end-1c", "\n")
         self.note_text.mark_set("insert", "end-1c")
+        self._apply_note_layout()
+
+    def _apply_note_layout(self) -> None:
+        try:
+            self.note_text.tag_add("body", "1.0", "end-1c")
+        except tk.TclError:
+            pass
 
     def _on_note_return(self, _event=None):
         """回车：换行并自动生成下一个圆点。"""
         self.note_text.insert("insert", "\n")
         self.note_text.insert("insert", "•", ("bullet",))
         self.note_text.insert("insert", " ")
+        self._apply_note_layout()
         self._on_note_edit()
         return "break"
 
@@ -468,11 +481,13 @@ class MainWindow:
             self.note_text.delete(f"{line}.1", f"{line}.3")
             if line > 1:
                 self.note_text.delete(f"{line - 1}.end", f"{line}.1")
+            self._apply_note_layout()
             self._on_note_edit()
             return "break"
         return None
 
     def _on_note_edit(self, _event=None) -> None:
+        self._apply_note_layout()
         if self._note_job is not None:
             try:
                 self.root.after_cancel(self._note_job)

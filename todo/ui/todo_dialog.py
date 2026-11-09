@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import tkinter as tk
+import traceback
+from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from ..models import Todo
@@ -75,7 +78,8 @@ class TodoDialog(tk.Toplevel):
         self._content_entry = self._add_field(outer, "内容 *", todo.content_text if todo else "", family)
 
         self._error = tk.Label(outer, text="", bg=colors["window_bg"], fg="#e5534b",
-                               font=(family, 9), anchor="w")
+                               font=(family, 9), anchor="w", justify="left",
+                               wraplength=_DLG_WIDTH - 28)
         self._error.pack(fill="x", pady=(2, 6))
 
         buttons = tk.Frame(outer, bg=colors["window_bg"])
@@ -139,6 +143,17 @@ class TodoDialog(tk.Toplevel):
         except ValidationError as exc:
             self._error.configure(text=str(exc))
             self._content_entry.focus_set()
+            return
+        except Exception as exc:  # noqa: BLE001
+            # 写库等异常：显示原因并记录日志，避免“点保存没反应”
+            text = traceback.format_exc()
+            try:
+                log_dir = Path(self.service.repo.db_path).parent
+                with (log_dir / "error.log").open("a", encoding="utf-8") as handle:
+                    handle.write(f"\n[{datetime.now():%Y-%m-%d %H:%M:%S}] save todo failed\n{text}\n")
+            except Exception:  # noqa: BLE001
+                pass
+            self._error.configure(text=f"保存失败：{exc}")
             return
         self.destroy()
 

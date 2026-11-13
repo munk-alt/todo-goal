@@ -160,3 +160,87 @@ class TodoDialog(tk.Toplevel):
     def _cancel(self) -> None:
         self.result = None
         self.destroy()
+
+
+class ConfirmDialog(tk.Toplevel):
+    """应用内置的置顶确认框（避免原生 messagebox 被 topmost 主窗口挡住）。"""
+
+    def __init__(self, parent: tk.Misc, colors: dict, title_text: str, message: str,
+                 ok_text: str = "确定", cancel_text: Optional[str] = "取消"):
+        super().__init__(parent)
+        self.colors = colors
+        self.result = False
+
+        self.overrideredirect(True)
+        self.configure(bg=colors["window_bg"])
+        try:
+            self.attributes("-topmost", True)
+            self.attributes("-alpha", 0.99)
+        except tk.TclError:
+            pass
+
+        family = theme.font_family()
+        symbol = theme.pick_symbol_font(self)
+        outer = tk.Frame(self, bg=colors["window_bg"], padx=16, pady=12)
+        outer.pack(fill="both", expand=True)
+
+        bar = tk.Frame(outer, bg=colors["window_bg"])
+        bar.pack(fill="x", pady=(0, 8))
+        title = tk.Label(bar, text=title_text, bg=colors["window_bg"], fg=colors["text"],
+                         font=(family, 12, "bold"), anchor="w")
+        title.pack(side="left")
+        close = tk.Label(bar, text="✕", bg=colors["window_bg"], fg=colors["muted"],
+                         font=(symbol, 11), cursor="hand2")
+        close.pack(side="right")
+        close.bind("<Button-1>", lambda e: self._cancel())
+        enable_window_drag(bar, self)
+        enable_window_drag(title, self)
+
+        tk.Label(outer, text=message, bg=colors["window_bg"], fg=colors["text"],
+                 font=(family, 10), justify="left", anchor="w", wraplength=304).pack(
+            fill="x", pady=(0, 12))
+
+        buttons = tk.Frame(outer, bg=colors["window_bg"])
+        buttons.pack(fill="x")
+        ok = tk.Button(buttons, text=ok_text, command=self._ok, bd=0,
+                       highlightthickness=0, relief="flat", cursor="hand2",
+                       bg=colors["accent"], fg=colors["window_bg"],
+                       activebackground=colors["accent"], activeforeground=colors["window_bg"],
+                       font=(family, 10, "bold"), padx=16, pady=5)
+        ok.pack(side="right")
+        if cancel_text:
+            cancel = tk.Button(buttons, text=cancel_text, command=self._cancel, bd=0,
+                               highlightthickness=0, relief="flat", cursor="hand2",
+                               bg=colors["hover"], fg=colors["text"],
+                               activebackground=colors["hover"], activeforeground=colors["text"],
+                               font=(family, 10), padx=14, pady=5)
+            cancel.pack(side="right", padx=(0, 8))
+
+        self.bind("<Escape>", lambda e: self._cancel())
+        self.bind("<Return>", lambda e: self._ok())
+
+        self.update_idletasks()
+        width = 360
+        height = self.winfo_reqheight()
+        parent = parent.winfo_toplevel() if hasattr(parent, "winfo_toplevel") else parent
+        px, py = parent.winfo_rootx(), parent.winfo_rooty()
+        pw, ph = parent.winfo_width(), parent.winfo_height()
+        x = px + max((pw - width) // 2, 0)
+        y = py + max((ph - height) // 3, 0)
+        self.geometry(f"{width}x{height}+{x}+{y}")
+        self.deiconify()
+        self.lift()
+        try:
+            self.grab_set()
+        except tk.TclError:
+            pass
+        self.focus_force()
+        ok.focus_set()
+
+    def _ok(self) -> None:
+        self.result = True
+        self.destroy()
+
+    def _cancel(self) -> None:
+        self.result = False
+        self.destroy()

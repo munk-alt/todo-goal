@@ -25,7 +25,7 @@ from ..hotkey import SHOW_EVENT_NAME, GlobalHotkey
 from ..models import Todo
 from ..service import TodoService
 from . import theme
-from .todo_dialog import TodoDialog
+from .todo_dialog import ConfirmDialog, TodoDialog
 from .widgets import ScrollableFrame, enable_window_drag
 
 DEFAULT_WIDTH = 362
@@ -357,8 +357,10 @@ class MainWindow:
         todo = self.service.get(todo_id)
         if todo is None:
             return
-        if not messagebox.askyesno(
-                "删除待办", f"确定删除「{todo.display_title}」吗？", parent=self.root):
+        dialog = ConfirmDialog(self.root, self.colors, "删除待办",
+                               f"确定删除「{todo.display_title}」吗？")
+        self.root.wait_window(dialog)
+        if not dialog.result:
             return
         self.service.delete(todo_id)
         self.refresh_todos()
@@ -595,9 +597,11 @@ class MainWindow:
 
     def _on_hide(self) -> None:
         if not getattr(self, "hotkey_ok", False):
-            messagebox.showinfo(
-                "提示", "全局快捷键注册失败，已取消隐藏（以免隐藏后无法唤出）。\n"
-                        "可使用右键菜单「退出程序」。", parent=self.root)
+            dialog = ConfirmDialog(
+                self.root, self.colors, "提示",
+                "全局快捷键注册失败，已取消隐藏（以免隐藏后无法唤出）。\n可使用右键菜单「退出程序」。",
+                ok_text="知道了", cancel_text=None)
+            self.root.wait_window(dialog)
             return
         self._save_note_now()
         self._save_settings()

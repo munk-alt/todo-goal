@@ -71,9 +71,10 @@ python app.py
 
 ## 数据与隐私
 
-- 数据库：`%APPDATA%\TodoApp\todo.db`（SQLite，含 `todos` 与 `note` 两张表）
-- 偏好设置：`%APPDATA%\TodoApp\settings.json`（窗口位置/大小、主题、置顶）
-- 备份：复制 `%APPDATA%\TodoApp` 文件夹即可；若该目录不可写会自动回退到程序目录下 `data\`。
+- 数据库：`release\TodoApp\data\todo.db`（SQLite，含 `todos` 与 `note` 两张表）
+- 偏好设置：同目录 `settings.json`（窗口位置/大小、主题、置顶）
+- 备份：复制 `release\TodoApp\data` 文件夹即可。
+- 便携/沙箱友好：优先使用程序目录下的 `data`（受限环境也可写）；不可写时回退 `%APPDATA%\TodoApp`。首次运行会把旧的 `%APPDATA%\TodoApp` 数据自动迁移过来。
 
 ## 项目结构
 
@@ -135,6 +136,7 @@ cd "D:\Agent Project\TODO"
 
 ## 版本
 
+- v2.1.2 —— 修复受限环境数据库只读导致新增/编辑/删除/移动失败：改用程序目录便携数据库并自动迁移旧数据；删除确认改为应用内置置顶确认框。
 - v2.1.1 —— 便签区改为 Windows 便签式圆点列表（回车自动生成下一个圆点，段首退格删除并合并）。
 - v2.1.0 —— 新增扁平便签图标、开始菜单快捷方式、开机自启（静默）、全局快捷键 `Ctrl+Shift+空格` 唤出、`✕` 隐藏到后台、单实例唤醒。
 - v2.0.1 —— 修复打包：改用文件夹版（避免单文件版在受限环境无法创建临时目录而打不开）。

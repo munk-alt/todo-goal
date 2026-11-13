@@ -28,8 +28,47 @@ WINDOW_TITLE = "Todo · 便签"
 
 
 def app_data_dir() -> Path:
+    """优先使用程序目录下的 data 文件夹（便携，受限/沙箱环境也可写）；不可写时回退 APPDATA。"""
+    if getattr(sys, "frozen", False):
+        portable = Path(sys.executable).resolve().parent / "data"
+    else:
+        portable = Path(__file__).resolve().parent / "data"
+    try:
+        portable.mkdir(parents=True, exist_ok=True)
+        probe = portable / ".write_test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return portable
+    except OSError:
+        pass
     base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or str(Path.home())
     return Path(base) / "TodoApp"
+
+
+def migrate_legacy_data(new_dir: Path) -> None:
+    """首次使用便携数据目录时，把旧的 %APPDATA%\\TodoApp 数据迁移过来。"""
+    try:
+        legacy = Path(os.environ.get("APPDATA") or "") / "TodoApp"
+        if not legacy.exists() or legacy.resolve() == new_dir.resolve():
+            return
+        target_db = new_dir / "todo.db"
+        legacy_db = legacy / "todo.db"
+        if legacy_db.exists() and not target_db.exists():
+            import sqlite3
+            src = sqlite3.connect("file:" + str(legacy_db).replace("\\", "/") + "?mode=ro", uri=True)
+            dst = sqlite3.connect(str(target_db))
+            with dst:
+                src.backup(dst)
+            dst.close()
+            src.close()
+        for name in ("settings.json", "error.log"):
+            source = legacy / name
+            target = new_dir / name
+            if source.exists() and not target.exists():
+                import shutil
+                shutil.copy2(source, target)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def write_error_log(data_dir, text: str) -> None:
@@ -97,6 +136,7 @@ def main() -> int:
     enable_dpi_awareness()
 
     data_dir = app_data_dir()
+    migrate_legacy_data(data_dir)
     try:
         data_dir.mkdir(parents=True, exist_ok=True)
     except OSError:
